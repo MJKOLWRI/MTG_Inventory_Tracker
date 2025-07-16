@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Inventory - Library</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% include 'header.html' %}
+
+    <main class="main-content">
+        <button id="new-box-btn">Create New Box</button>
+
+        <div id="box-container">
+            {% for box in all_boxes %}
+            <div class="collapsible-box" data-box-id="{{ box.id }}" data-box-alias="{{ box.alias or '' }}">
+                <div class="box-header">
+                    <span>
+                        <a href="/box/{{ box.id }}" class="box-link">Box #{{ box.id }}</a>
+                        {% if box.alias %} ({{ box.alias }}){% endif %} <span style="font-weight: normal; color: #333;">[Unique: {{ box.unique_count }} | Total: {{ box.total_count }}]</span>
+                    </span>
+                    <i class="arrow"></i>
+                </div>
+                <div class="box-content">
+                    <div class="card-grid">
+                        {% if box.cards %}
+                            {% for card in box.cards %}
+                            <div class="grid-card" data-card-id="{{ card.id }}" data-box-id="{{ box.id }}" data-quantity="{{ card.quantity }}">
+                                <img src="{{ ('/card_images/' + card.image_url) if card.image_url else 'https://via.placeholder.com/150x209.png?text=No+Image' }}" alt="{{ card.name }}">
+                                <div class="card-details">
+                                    <p class="card-name">
+                                        <strong><a href="/card/{{ card.id }}">{{ card.name }}</a></strong>
+                                    </p>
+                                    <p class="card-info">{{ card.mana_cost | replace_symbols | safe }}</p>
+                                    <p class="card-info">{{ card.type_line }}</p>
+                                    {% if card.power is not none %}<p class="card-info"><strong>{{ card.power }}/{{ card.toughness }}</strong></p>{% endif %}
+                                    <p class="card-text">{{ card.oracle_text | replace_symbols | safe }}</p>
+                                    {% if card.flavor_text %}<p class="card-text flavor">{{ card.flavor_text | replace_symbols | safe }}</p>{% endif %}
+                                </div>
+                                <div class="controls">
+                                    <button class="qty-btn" data-change="-1">-</button>
+                                    <span class="qty-display">{{ card.quantity }}</span>
+                                    <button class="qty-btn" data-change="1">+</button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>This box is empty.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% include 'to_top_btn.html' %}
+    </main>
+
+    <div id="context-menu" class="context-menu"></div>
+    {% include 'modal.html' %}
+
+    <script>
+        // This makes the initial data from Flask available to our script
+        let allBoxesData = {{ all_boxes | tojson }};
+    </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const boxContainer = document.getElementById('box-container');
+        const newBoxBtn = document.getElementById('new-box-btn');
+        const contextMenu = document.getElementById('context-menu');
+        const modal = document.getElementById('image-modal');
+        const modalImage = document.getElementById('modal-image');
+        const closeModal = document.getElementById('modal-close');
+
+        let clipboard = null;
+        const hideContextMenu = () => { if(contextMenu) contextMenu.style.display = 'none'; };
+
+        // --- Scroll to Top Button Logic
+        const scrollTopBtn = document.getElementById('scroll-to-top-btn');
+        const mainContent = document.querySelector('.main-content'); // The scrollable element
+
+        if (scrollTopBtn && mainContent) {
+            // Show the button when the user scrolls down
+            mainContent.onscroll = () => {
+                if (mainContent.scrollTop > 20) {
+                    scrollTopBtn.style.display = "block";
+                } else {
+                    scrollTopBtn.style.display = "none";
+                }
+            };
+
+            // Scroll to the top when the user clicks the button
+            scrollTopBtn.addEventListener('click', () => {
+                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+
+
+        // --- Helper function to redraw a box's contents after a paste ---
+        const renderBoxContents = (boxId) => {
+            const boxData = allBoxesData.find(b => b.id === boxId);
+            const boxDiv = document.querySelector(`.collapsible-box[data-box-id="${boxId}"]`);
+            if (!boxDiv || !boxData) return;
+            const cardGrid = boxDiv.querySelector('.card-grid');
+            cardGrid.innerHTML = '';
+
+            const symbolsReplacer = (text) => {
+                if (!text) return '';
+                const style = "width:1em; height:1em; vertical-align:-0.125em; margin:0 0.05em;";
+                return text.replace(/\{([A-Z0-9/]+)\}/g, (match, code) => `<img src="https://svgs.scryfall.io/card-symbols/${code.replace('/', '')}.svg" style="${style}" alt="${match}">`);
+            };
+
+            if (boxData.cards && boxData.cards.length > 0) {
+                boxData.cards.forEach(card => {
+                    const powerToughness = (card.power !== null && card.power !== undefined) ? `<p class="card-info"><strong>${card.power}/${card.toughness}</strong></p>` : '';
+                    const flavorText = card.flavor_text ? `<p class="card-text flavor">${symbolsReplacer(card.flavor_text)}</p>` : '';
+                    const imageUrl = card.image_url ? `/card_images/${card.image_url}` : '';
+                    const cardHtml = `
+                        <div class="grid-card" data-card-id="${card.id}" data-box-id="${boxId}" data-quantity="${card.quantity}">
+                            <img src="${imageUrl}" alt="${card.name}">
+                            <div class="card-details">
+                                <p class="card-name"><strong><a href="/card/${card.id}">${card.name}</a></strong></p>
+                                <p class="card-info">${symbolsReplacer(card.mana_cost)}</p>
+                                <p class="card-info">${card.type_line || ''}</p>
+                                ${powerToughness}
+                                <p class="card-text">${symbolsReplacer(card.oracle_text)}</p>
+                                ${flavorText}
+                            </div>
+                            <div class="controls">
+                                <button class="qty-btn" data-change="-1">-</button>
+                                <span class="qty-display">${card.quantity}</span>
+                                <button class="qty-btn" data-change="1">+</button>
+                            </div>
+                        </div>`;
+                    cardGrid.insertAdjacentHTML('beforeend', cardHtml);
+                });
+            } else {
+                cardGrid.innerHTML = '<p>This box is empty.</p>';
+            }
+        };
+
+        // --- Event Listeners ---
+        if (boxContainer) {
+            boxContainer.addEventListener('click', async (event) => {
+                // Check if the click was specifically on our new link
+                if (event.target.classList.contains('box-link')) {
+                    // Stop the click from propagating to the parent .box-header
+                    event.stopPropagation();
+                }
+                if (event.target.closest('.box-header')) {
+                    event.target.closest('.collapsible-box').classList.toggle('expanded');
+                } else if (event.target.classList.contains('qty-btn')) {
+                    const cardDiv = event.target.closest('.grid-card');
+                    const qtyDisplay = cardDiv.querySelector('.qty-display');
+                    const response = await fetch('/update_card_quantity', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            box_id: cardDiv.dataset.boxId,
+                            card_id: cardDiv.dataset.cardId,
+                            change: parseInt(event.target.dataset.change, 10)
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        if (result.new_quantity > 0) {
+                            qtyDisplay.textContent = result.new_quantity;
+                            cardDiv.dataset.quantity = result.new_quantity;
+                        } else {
+                            cardDiv.remove();
+                        }
+                    } else {
+                        alert(`Error: ${result.error}`);
+                    }
+                } else if (event.target.tagName === 'IMG') {
+                    if (modal) modal.style.display = "flex";
+                    if (modalImage) modalImage.src = event.target.src;
+                }
+            });
+
+            boxContainer.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                hideContextMenu();
+                const cardTarget = event.target.closest('.grid-card');
+                const boxHeaderTarget = event.target.closest('.box-header');
+                if (cardTarget) {
+                    const cardId = cardTarget.dataset.cardId;
+                    const boxId = cardTarget.dataset.boxId;
+                    const quantity = parseInt(cardTarget.dataset.quantity, 10);
+                    contextMenu.innerHTML = `<ul><li data-action="copy" data-card-id="${cardId}" data-box-id="${boxId}">Copy Card</li><li data-action="cut-one" data-card-id="${cardId}" data-box-id="${boxId}">Cut One</li><li data-action="cut-all" data-card-id="${cardId}" data-box-id="${boxId}" data-quantity="${quantity}">Cut All</li><hr><li data-action="delete-all" data-card-id="${cardId}" data-box-id="${boxId}">Delete All from Box</li></ul>`;
+                } else if (boxHeaderTarget) {
+                    const boxId = boxHeaderTarget.closest('.collapsible-box').dataset.boxId;
+                    const alias = boxHeaderTarget.closest('.collapsible-box').dataset.boxAlias;
+                    const pasteDisabled = clipboard ? '' : 'style="color: #666; cursor: not-allowed;"';
+                    contextMenu.innerHTML = `<ul><li data-action="paste" data-box-id="${boxId}" ${pasteDisabled}>Paste Card(s)</li>
+                                            <hr>
+                                            <li data-action="rename" data-box-id="${boxId}" data-alias="${alias}">Rename Box</li>
+                                            <li data-action="refresh" data-box-id="${boxId}">Refresh Box Data</li>
+                                            <li data-action="delete-box" data-box-id="${boxId}">Delete Box</li></ul>`;
+                } else { return; }
+                contextMenu.style.display = 'block';
+                contextMenu.style.left = `${event.pageX}px`;
+                contextMenu.style.top = `${event.pageY}px`;
+            });
+        }
+
+        if (contextMenu) {
+            contextMenu.addEventListener('click', async (event) => {
+                const target = event.target;
+                const action = target.dataset.action;
+                if (!action || target.style.cursor === 'not-allowed') return;
+                hideContextMenu();
+                const cardId = target.dataset.cardId;
+                const boxId = target.dataset.boxId;
+
+                if (action.startsWith('copy') || action.startsWith('cut')) {
+                    const sourceBox = allBoxesData.find(b => b.id === boxId);
+                    const cardToCopy = sourceBox.cards.find(c => c.id === cardId);
+                    if (!cardToCopy) return;
+                    clipboard = [JSON.parse(JSON.stringify(cardToCopy))];
+                    if (action === 'copy' || action === 'cut-one') { clipboard[0].quantity = 1; }
+                    else if (action === 'cut-all') { clipboard[0].quantity = parseInt(target.dataset.quantity, 10); }
+                    if (action.startsWith('cut')) {
+                        const change = (action === 'cut-one') ? -1 : -clipboard[0].quantity;
+                        const response = await fetch('/update_card_quantity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ box_id: boxId, card_id: cardId, change: change }) });
+                        const result = await response.json();
+                        if (result.success) {
+                            const cardDiv = document.querySelector(`.grid-card[data-card-id="${cardId}"][data-box-id="${boxId}"]`);
+                            if (result.new_quantity > 0) {
+                                cardDiv.querySelector('.qty-display').textContent = result.new_quantity;
+                                cardDiv.dataset.quantity = result.new_quantity;
+                            } else { cardDiv.remove(); }
+                        }
+                    }
+                } else if (action === 'delete-all') {
+                    const qty = parseInt(document.querySelector(`.grid-card[data-card-id="${cardId}"][data-box-id="${boxId}"]`).dataset.quantity, 10);
+                    await fetch('/update_card_quantity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ box_id: boxId, card_id: cardId, change: -qty }) });
+                    document.querySelector(`.grid-card[data-card-id="${cardId}"][data-box-id="${boxId}"]`).remove();
+                } else if (action === 'paste') {
+                    if (!clipboard) return;
+                    const response = await fetch('/paste_cards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ box_id: boxId, clipboard: clipboard }) });
+                    const result = await response.json();
+                    if(result.success) {
+                        const targetBoxData = allBoxesData.find(b => b.id === boxId);
+                        targetBoxData.cards = result.updated_box.cards;
+                        renderBoxContents(boxId);
+                    }
+                    clipboard = null;
+                } else if (action === 'rename') {
+                    const newAlias = prompt('Enter new box name:', target.dataset.alias);
+                    if (newAlias && newAlias.trim() !== '') {
+                        await fetch('/rename_box', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ box_id: boxId, new_alias: newAlias }) });
+                        const boxHeaderSpan = document.querySelector(`.collapsible-box[data-box-id="${boxId}"] .box-header span`);
+                        boxHeaderSpan.textContent = `Box #${boxId} (${newAlias})`;
+                    }
+                } else if (action === 'delete-box') {
+                    if (confirm('Are you sure? This cannot be undone.')) {
+                        await fetch('/delete_box', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ box_id: boxId }) });
+                        document.querySelector(`.collapsible-box[data-box-id="${boxId}"]`).remove();
+                    }
+                } else if (action === 'refresh') {
+                    if (confirm('This will re-fetch data for all cards in this box from the internet. This can take a moment. Continue?')) {
+                        const boxHeader = document.querySelector(`.collapsible-box[data-box-id="${boxId}"] .box-header`);
+                        const headerSpan = boxHeader.querySelector('span');
+                        const originalText = headerSpan.innerHTML;
+
+                        // 1. Update UI to show "Refreshing..." state
+                        headerSpan.textContent = 'Refreshing...';
+                        boxHeader.classList.add('refreshing');
+
+                        try {
+                            const response = await fetch('/refresh_box', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ box_id: boxId })
+                            });
+                            const result = await response.json();
+
+                            if (result.success) {
+                                // 2. Show success message, then reload
+                                headerSpan.textContent = '✓ Refresh Complete!';
+                                setTimeout(() => window.location.reload(), 1500);
+                            } else {
+                                alert(`Error: ${result.error}`);
+                                headerSpan.innerHTML = originalText; // Revert text on error
+                            }
+                        } catch (error) {
+                            alert('An unexpected network error occurred.');
+                            headerSpan.innerHTML = originalText; // Revert text on error
+                        } finally {
+                            boxHeader.classList.remove('refreshing');
+                        }
+                    }
+                }
+            });
+        }
+
+        if (newBoxBtn) {
+            newBoxBtn.addEventListener('click', () => { fetch('/create_box', { method: 'POST' }).then(res => res.json()).then(data => { if (data.success) window.location.reload(); }); });
+        }
+
+        window.addEventListener('click', (event) => {
+            if (!event.target.closest('.context-menu')) hideContextMenu();
+            if (event.target == modal) modal.style.display = "none";
+        });
+        if(closeModal) closeModal.onclick = () => modal.style.display = "none";
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const boxToExpand = urlParams.get('box');
+        if (boxToExpand) {
+            const boxDiv = document.querySelector(`.collapsible-box[data-box-id="${boxToExpand}"]`);
+            if (boxDiv) {
+                boxDiv.classList.add('expanded');
+                boxDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    });
+    </script>
+</body>
+</html>

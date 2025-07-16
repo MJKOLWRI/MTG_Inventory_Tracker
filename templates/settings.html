@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .settings-container { max-width: 600px; margin: auto; }
+        .setting-item { display: flex; flex-direction: column; align-items: flex-start; padding: 15px; background: #2e2e2e; border-radius: 8px; margin-bottom: 15px; }
+
+        /* Styles for the main setting sections */
+        .setting-item-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+        /* Styles for the Default Import Location box */
+        .setting-item h4 { margin: 0 0 5px 0; font-size: 16px; font-weight: bold; }
+        .setting-item .description { font-size: 14px; color: #ccc; margin: 0 0 15px 0; }
+        .setting-option { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 10px; }
+        .setting-option label { font-weight: normal; }
+        .setting-option select { flex-grow: 1; }
+
+        .btn-group { margin-top: 10px; }
+        .btn { padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; border: none; }
+        .save-btn { background-color: #007bff; color: white; }
+        .restart-btn { background-color: #dc3545; color: white; margin-left: 10px; }
+        .qr-code-container { text-align: center; background-color: #2e2e2e; padding: 20px; margin-top: 20px; border-radius: 5px;}
+        .qr-code-container img { width: 200px; height: 200px; background-color: white; padding: 10px; border-radius: 5px; }
+        .qr-code-container p { margin-top: 10px; font-family: monospace; color: #ccc; }
+        /* Add this to your <style> block */
+        .flash-message {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .flash-message.success {
+            background-color: #28a745;
+            color: white;
+        }
+        .flash-message.error {
+            background-color: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+    <main class="main-content">
+        <div class="settings-container">
+            <h1>Settings</h1>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+            <hr>
+            <div class="setting-item">
+                <div class="setting-item-row">
+                    <label for="network-toggle">Make server accessible on local network</label>
+                    <input type="checkbox" id="network-toggle" {% if config.network_server_enabled %}checked{% endif %}>
+                </div>
+            </div>
+            <p style="font-size: 12px; color: #ccc;">Requires an application restart to take effect.</p>
+            <div class="setting-item">
+                <div class="setting-item-row">
+                    <label for="debug-toggle">Enable debug mode (for development)</label>
+                    <input type="checkbox" id="debug-toggle" {% if config.debug_mode %}checked{% endif %}>
+                </div>
+            </div>
+            <p style="font-size: 12px; color: #ccc;">Requires an application restart to take effect.</p>
+            <div class="setting-item">
+                <h4>Default Import Location</h4>
+                <p class="description">Choose the default location for the Manual Import page.</p>
+
+                <div class="setting-option">
+                    <label><input type="radio" name="import_default" value="last_selected" {% if config.import_default.mode == 'last_selected' %}checked{% endif %}> Last Used</label>
+                </div>
+                <div class="setting-option">
+                    <label><input type="radio" name="import_default" value="new_box" {% if config.import_default.mode == 'new_box' %}checked{% endif %}> Always Create New Box</label>
+                </div>
+                <div class="setting-option">
+                    <label><input type="radio" name="import_default" value="specific" {% if config.import_default.mode == 'specific' %}checked{% endif %}> Specific Location:</label>
+                    <select id="specific-location-select" name="default_location">
+                        {% for loc in all_locations %}
+                            <option value="{{ loc.type }}:{{ loc.id }}" {% if config.import_default.default_location == loc.type + ':' + loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button id="save-settings-btn" class="btn save-btn">Save Settings</button>
+            </div>
+            <p id="save-status" style="color: #5cb85c;"></p>
+{#            <div class="setting-item">#}
+{#                <h4>Backup & Restore</h4>#}
+{##}
+{#                <p class="description">Export your entire collection, including all decks and downloaded images, into a single .zip backup file.</p>#}
+{#                <button id="export-btn" class="btn save-btn">Export Full Collection</button>#}
+{##}
+{#                <hr style="width:100%; margin: 20px 0;">#}
+{##}
+{#                <p class="description">Restore a collection from a backup file.#}
+{#                    <strong style="color: #ffcccc;">WARNING:</strong> This will overwrite all of your current data. Your current collection will be automatically backed up to the `backups/` folder first.#}
+{#                </p>#}
+{#                <form action="/import_collection" method="post" enctype="multipart/form-data">#}
+{#                    <input type="file" name="backup_file" accept=".zip" required>#}
+{#                    <button type="submit" class="btn restart-btn" style="margin-left: 10px;">Import Collection</button>#}
+{#                </form>#}
+{#            </div>#}
+
+            {% if qr_code_data_uri %}
+            <div class="qr-code-container">
+                <h4>Connect from another device on this network</h4>
+                <img src="{{ qr_code_data_uri }}" alt="QR Code for Local Network Address">
+                <p>Or go to: <strong>http://{{ local_ip_address }}:5000</strong></p>
+            </div>
+            {% endif %}
+
+        </div>
+    </main>>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const saveBtn = document.getElementById('save-settings-btn');
+            const restartBtn = document.getElementById('restart-btn');
+            const statusEl = document.getElementById('save-status');
+
+            const exportBtn = document.getElementById('export-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', () => {
+                    // This directly navigates the window to the download URL.
+                    // It behaves like a normal link click, which pywebview handles correctly.
+                    window.location.href = '/export_collection';
+                });
+            }
+
+            saveBtn.addEventListener('click', async () => {
+                const is_network_enabled = document.getElementById('network-toggle').checked;
+                const is_debug_enabled = document.getElementById('debug-toggle').checked;
+                const statusEl = document.getElementById('save-status');
+                const import_mode = document.querySelector('input[name="import_default"]:checked').value;
+                const default_location = document.getElementById('specific-location-select').value;
+
+                statusEl.textContent = "Saving...";
+                statusEl.style.color = '#ccc'; // Set to a neutral color
+
+                try {
+                    const response = await fetch('/save_settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            network_server_enabled: is_network_enabled,
+                            debug_mode: is_debug_enabled,
+                            import_default: {
+                                mode: import_mode,
+                                default_location: default_location
+                            }
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        statusEl.style.color = '#5cb85c'; // Green for success
+                        statusEl.textContent = result.message;
+                    } else {
+                        statusEl.style.color = '#dc3545'; // Red for error
+                        statusEl.textContent = `Error: ${result.error}`;
+                    }
+                } catch (error) {
+                    statusEl.style.color = '#dc3545'; // Red for error
+                    statusEl.textContent = 'A network error occurred.';
+                    console.error("Error saving settings:", error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

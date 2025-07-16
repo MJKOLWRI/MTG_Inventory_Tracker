@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .search-form-container { max-width: 800px; margin: auto; }
+        .form-grid { display: grid; grid-template-columns: 150px 1fr; gap: 15px; align-items: center; }
+        .form-grid label { font-weight: bold; text-align: right; }
+        .form-grid input, .form-grid select { width: 100%; padding: 8px; background: #212529; color: white; border: 1px solid #5a5a5a; border-radius: 4px; box-sizing: border-box; }
+        .form-grid .operator-input-group { display: flex; gap: 8px; }
+        .form-grid .operator-input-group select { flex: 0 0 120px; }
+        .form-grid-span-2 { grid-column: 1 / -1; }
+        .form-actions { text-align: right; margin-top: 20px; }
+        .form-actions button { padding: 10px 20px; border-radius: 5px; border: none; font-weight: bold; cursor: pointer; }
+        .search-btn { background-color: #007bff; color: white; }
+        .color-checkbox-group { display: flex; align-items: center; gap: 25px; }
+        .color-checkbox-group label { display: flex; align-items: center; gap: 4px; font-weight: normal; }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+    <main class="main-content">
+        <div class="search-form-container">
+            <h1>Advanced Search</h1>
+            <hr>
+            <form action="/search" method="GET" class="form-grid">
+                <label for="card_name">Card Name</label>
+                <input type="text" id="card_name" name="card_name">
+
+                <label for="set_code">Set / Expansion</label>
+                <select id="set_code" name="set_code">
+                    <option value="">Any Set</option>
+                    {% for set in set_list %}
+                    <option value="{{ set.code }}">{{ set.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="oracle_text">Oracle Text</label>
+                <input type="text" id="oracle_text" name="oracle_text" placeholder='For exact phrases, use "quotes"'>
+
+                <label for="card_type">Card Type</label>
+                <input type="text" id="card_type" name="card_type" placeholder="e.g., Creature, Instant, Artifact">
+
+                <label for="card_tag">Card Tag</label>
+                <input type="text" id="card_tag" name="card_tag" placeholder="e.g., Staple, Ramp, Combo Piece">
+
+                <label>Colors</label>
+                <div class="operator-input-group">
+                    <select name="color_operator">
+                        <option value="=">Exactly these</option>
+                        <option value=">=">Includes these</option>
+                        <option value="<=">At most these</option>
+                    </select>
+                    <div class="color-checkbox-group">
+                        <label><input type="checkbox" name="colors" value="W"><img src="https://svgs.scryfall.io/card-symbols/W.svg" class="mana-symbol" alt="White"></label>
+                        <label><input type="checkbox" name="colors" value="U"><img src="https://svgs.scryfall.io/card-symbols/U.svg" class="mana-symbol" alt="Blue"></label>
+                        <label><input type="checkbox" name="colors" value="B"><img src="https://svgs.scryfall.io/card-symbols/B.svg" class="mana-symbol" alt="Black"></label>
+                        <label><input type="checkbox" name="colors" value="R"><img src="https://svgs.scryfall.io/card-symbols/R.svg" class="mana-symbol" alt="Red"></label>
+                        <label><input type="checkbox" name="colors" value="G"><img src="https://svgs.scryfall.io/card-symbols/G.svg" class="mana-symbol" alt="Green"></label>
+                        <label><input type="checkbox" name="colors" value="C"><img src="https://svgs.scryfall.io/card-symbols/C.svg" class="mana-symbol" alt="Colorless"></label>
+                    </div>
+                </div>
+
+                <label>Color Identity</label>
+                <div class="color-checkbox-group">
+                    <label><input type="checkbox" name="color_identity" value="W"><img src="https://svgs.scryfall.io/card-symbols/W.svg" class="mana-symbol" alt="White"></label>
+                    <label><input type="checkbox" name="color_identity" value="U"><img src="https://svgs.scryfall.io/card-symbols/U.svg" class="mana-symbol" alt="Blue"></label>
+                    <label><input type="checkbox" name="color_identity" value="B"><img src="https://svgs.scryfall.io/card-symbols/B.svg" class="mana-symbol" alt="Black"></label>
+                    <label><input type="checkbox" name="color_identity" value="R"><img src="https://svgs.scryfall.io/card-symbols/R.svg" class="mana-symbol" alt="Red"></label>
+                    <label><input type="checkbox" name="color_identity" value="G"><img src="https://svgs.scryfall.io/card-symbols/G.svg" class="mana-symbol" alt="Green"></label>
+                    <label><input type="checkbox" name="color_identity" value="C"><img src="https://svgs.scryfall.io/card-symbols/C.svg" class="mana-symbol" alt="Colorless"></label>
+                </div>
+
+                <label for="mana_value">Mana Value</label>
+                <div class="operator-input-group">
+                    <select name="mv_operator">
+                        <option value="=">Equals</option>
+                        <option value=">=">Greater than or =</option>
+                        <option value="<=">Less than or =</option>
+                    </select>
+                    <input type="number" id="mana_value" name="mana_value" min="0">
+                </div>
+
+                <label for="sort_order">Sort Order</label>
+                <select id="sort_order" name="sort_order">
+                    <option value="name">Name</option>
+                    <option value="set">Set</option>
+                    <option value="cmc">Mana Value</option>
+                    <option value="power">Power</option>
+                    <option value="toughness">Toughness</option>
+                </select>
+
+                <label for="sort_dir">Sort Direction</label>
+                <select id="sort_dir" name="sort_dir">
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                </select>
+
+                <input type="hidden" name="library_search" id="adv_library_hidden">
+                <input type="hidden" name="non_library_search" id="adv_non_library_hidden">
+
+                <div class="form-grid-span-2 form-actions">
+                    <button type="submit" class="search-btn">Search</button>
+                </div>
+            </form>
+        </div>
+    </main>
+    <script>
+        // This script synchronizes the hidden inputs with the saved toggle state
+        document.addEventListener('DOMContentLoaded', () => {
+            const libHidden = document.getElementById('adv_library_hidden');
+            const nonLibHidden = document.getElementById('adv_non_library_hidden');
+
+            // Read the toggle state from localStorage (set by the header script)
+            const savedLibState = localStorage.getItem('library_search_toggle') || 'on';
+            const savedNonLibState = localStorage.getItem('non_library_search_toggle') || 'off';
+
+            // Set the value of the hidden inputs before the form is submitted
+            libHidden.value = savedLibState;
+            nonLibHidden.value = savedNonLibState;
+        });
+    </script>
+</body>
+</html>

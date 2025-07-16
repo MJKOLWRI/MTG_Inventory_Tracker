@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Box #{{ box.id if box else 'Not Found' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* This page can reuse most of the existing styles */
+        .box-view-container {
+            padding: 20px;
+        }
+        .box-view-container h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+    <main class="main-content">
+        <a href="/" id="back-button" class="back-button">&larr; Back to Library</a>
+        {% if box %}
+        <div class="box-view-container">
+            <h2>
+                <span>Box #{{ box.id }} {% if box.alias %}({{ box.alias }}){% endif %}</span>
+                <span style="color: #ccc;">[Unique: {{ box.unique_count }} | Total: {{ box.total_count }}]</span>
+            </h2>
+            <hr>
+            <div class="view-controls" style="display: flex; gap: 20px; margin-bottom: 20px;">
+                <div>
+                    <label for="group-by-select">Group By:</label>
+                    <select id="group-by-select" class="view-select">
+                        <option value="none" {% if current_group == 'none' %}selected{% endif %}>None</option>
+                        <option value="type" {% if current_group == 'type' %}selected{% endif %}>Type</option>
+                        <option value="tags" {% if current_group == 'tags' %}selected{% endif %}>Tags</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="sort-by-select">Sort By:</label>
+                    <select id="sort-by-select" class="view-select">
+                        <option value="name" {% if current_sort == 'name' %}selected{% endif %}>Name</option>
+                        <option value="cmc" {% if current_sort == 'cmc' %}selected{% endif %}>Mana Cost</option>
+                        <option value="set" {% if current_sort == 'set' %}selected{% endif %}>Set / Number</option>
+                    </select>
+                </div>
+            </div>
+            <div id="card-grid-container">
+                {% for group_name, cards_in_group in cards_data.items() %}
+                    <h3 class="card-group-header" style="margin-top: 25px; border-bottom: 1px solid #444; padding-bottom: 5px;">
+                        {{ group_name }} ({{ cards_in_group|length }})
+                    </h3>
+                    <div class="card-grid">
+                        {% for card in cards_in_group %}
+                            <div class="grid-card" data-card-id="{{ card.id }}" data-box-id="{{ box.id }}">
+                                <img src="{{ ('/card_images/' + card.image_url) if card.image_url else 'https://via.placeholder.com/150x209.png?text=No+Image' }}" alt="{{ card.name }}">
+                                <div class="card-details">
+                                    <p class="card-name"><strong><a href="/card/{{ card.id }}">{{ card.name }}</a></strong></p>
+                                    <p class="card-info">{{ card.mana_cost | replace_symbols | safe }}</p>
+                                    <p class="card-info">{{ card.type_line }}</p>
+                                    {% if card.power %}<p class="card-info"><strong>{{ card.power }}/{{ card.toughness }}</strong></p>{% endif %}
+                                    <p class="card-text">{{ card.oracle_text | replace_symbols | safe }}</p>
+                                    {% if card.flavor_text %}<p class="card-text flavor">{{ card.flavor_text | replace_symbols | safe }}</p>{% endif %}
+                                </div>
+                                <div class="controls">
+                                    <button class="qty-btn" data-change="-1">-</button>
+                                    <span class="qty-display">{{ card.quantity }}</span>
+                                    <button class="qty-btn" data-change="1">+</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <h2>Box Not Found</h2>
+        {% endif %}
+        {% include 'to_top_btn.html' %}
+    </main>
+
+    {% include 'modal.html' %}
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const cardGrid = document.getElementById('card-grid');
+
+        const groupBySelect = document.getElementById('group-by-select');
+        const sortBySelect = document.getElementById('sort-by-select');
+
+        function updateView() {
+            const group = groupBySelect.value;
+            const sort = sortBySelect.value;
+            const newUrl = `${window.location.pathname}?group_by=${group}&sort_by=${sort}`;
+            window.location.href = newUrl;
+        }
+
+        if (groupBySelect && sortBySelect) {
+            groupBySelect.addEventListener('change', updateView);
+            sortBySelect.addEventListener('change', updateView);
+        }
+
+        const modal = document.getElementById('image-modal');
+        const closeModal = document.getElementById('modal-close');
+
+        if (modal && closeModal) {
+            // Close the modal when the 'X' is clicked
+            closeModal.onclick = function() {
+                modal.style.display = "none";
+            }
+
+            // Close the modal when the background is clicked
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+            }
+        }
+
+        // Note: Your existing cardGrid event listener should now target the new container
+        const cardGridContainer = document.getElementById('card-grid-container');
+        if (cardGridContainer) {
+    cardGridContainer.addEventListener('click', async (event) => {
+        // Handle quantity button clicks
+        if (event.target.classList.contains('qty-btn')) {
+            const cardDiv = event.target.closest('.grid-card');
+            const change = parseInt(event.target.dataset.change, 10);
+            const response = await fetch('/update_card_quantity', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    box_id: cardDiv.dataset.boxId,
+                    card_id: cardDiv.dataset.cardId,
+                    change: change
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                if (result.new_quantity > 0) {
+                    cardDiv.querySelector('.qty-display').textContent = result.new_quantity;
+                } else {
+                    cardDiv.remove();
+                }
+            } else {
+                alert(`Error: ${result.error}`);
+            }
+        }
+        // Handle image clicks for the modal
+        else if (event.target.tagName === 'IMG') {
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            if (modal && modalImage) {
+                modal.style.display = "flex";
+                modalImage.src = event.target.src;
+            }
+        }
+    });
+}
+
+        // Back Button Logic
+        const backBtn = document.getElementById('back-button');
+        if (backBtn) {
+            backBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                window.history.back();
+            });
+        }
+
+        // --- Scroll to Top Button Logic
+        const scrollTopBtn = document.getElementById('scroll-to-top-btn');
+        const mainContent = document.querySelector('.main-content'); // The scrollable element
+
+        if (scrollTopBtn && mainContent) {
+            // Show the button when the user scrolls down
+            mainContent.onscroll = () => {
+                if (mainContent.scrollTop > 20) {
+                    scrollTopBtn.style.display = "block";
+                } else {
+                    scrollTopBtn.style.display = "none";
+                }
+            };
+
+            // Scroll to the top when the user clicks the button
+            scrollTopBtn.addEventListener('click', () => {
+                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+    });
+    </script>
+</body>
+</html>

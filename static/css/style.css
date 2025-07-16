@@ -1,0 +1,437 @@
+/* --- Global Theme & Body --- */
+body {
+    background-color: #3c3c3c;
+    color: #d1d1d1;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* --- Reusable Header --- */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #2e2e2e;
+    padding: 0 12px;
+    border-bottom: 1px solid #5a5a5a;
+    flex-shrink: 0;
+}
+
+/* --- Scroll to Top Button --- */
+#scroll-to-top-btn {
+    display: none; /* Hidden by default */
+    position: fixed; /* Keep it in place while scrolling */
+    bottom: 20px;
+    right: 30px;
+    z-index: 99; /* Make sure it's on top of other content */
+    border: 1px solid #ffaf4d;
+    outline: none;
+    background-color: #ff8c00;
+    color: #1e1e1e;
+    cursor: pointer;
+    padding: 10px 15px;
+    border-radius: 5px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+a.box-link {
+    color: #1e1e1e;
+    text-decoration: none;
+}
+a.box-link:hover {
+    text-decoration: underline;
+}
+
+#scroll-to-top-btn:hover {
+    background-color: #ffaf4d;
+}
+
+/* --- Main Navigation & Links --- */
+.main-nav {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.main-nav a {
+    text-decoration: none;
+}
+.main-nav button {
+    background: none;
+    border: none;
+    color: #b0b0b0;
+    padding: 14px 16px;
+    font-size: 16px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+}
+.main-nav button:hover {
+    background-color: #3f3f3f;
+}
+.main-nav button.active {
+    color: #ffffff;
+    border-bottom: 3px solid #ff8c00;
+}
+
+/* --- "Create New Box" Button --- */
+#new-box-btn {
+    background-color: #ff8c00;
+    color: #1e1e1e;
+    font-weight: bold;
+    font-size: 14px;
+    border-radius: 5px;
+    border: 1px solid #ffaf4d;
+    padding: 8px 12px;
+    margin-bottom: 15px;
+}
+#new-box-btn:hover {
+    background-color: #ffaf4d;
+}
+
+/* --- Main Content Area --- */
+.main-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+/* --- Collapsible Box Component --- */
+.collapsible-box {
+    margin-bottom: 15px;
+}
+.box-header {
+    background-color: #ff8c00;
+    color: #1e1e1e;
+    font-weight: bold;
+    padding: 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.box-header .arrow {
+    border: solid #1e1e1e;
+    border-width: 0 3px 3px 0;
+    display: inline-block;
+    padding: 4px;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease-in-out;
+}
+.box-content {
+    display: none;
+    padding: 15px;
+    background-color: #4a4a4a;
+    border: 1px solid #5a5a5a;
+    border-top: none;
+    border-radius: 0 0 5px 5px;
+}
+.collapsible-box.expanded .box-content {
+    display: block;
+}
+.collapsible-box.expanded .box-header {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.collapsible-box.expanded .box-header .arrow {
+    transform: rotate(-45deg);
+}
+
+/* --- GRID & ROW LAYOUTS --- */
+/* For the wrapping grid on Search and Import pages */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 188px);
+    gap: 20px;
+    justify-content: start;
+}
+/* For the horizontal scroll on the Library page */
+.card-row {
+    display: flex;
+    overflow-x: auto;
+    gap: 15px;
+    padding-bottom: 15px;
+}
+
+/* --- UNIFIED CARD STYLE --- */
+.grid-card {
+    background-color: #333;
+    border: 1px solid #5a5a5a;
+    border-radius: 12px;
+    padding: 8px;
+    text-align: center;
+    width: 188px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0; /* Important for horizontal scrolling */
+}
+.grid-card img {
+    width: 100%;
+    border-radius: 8px;
+    cursor: zoom-in;
+}
+.grid-card .card-details {
+    padding: 5px;
+    text-align: left;
+    flex-grow: 1; /* Allows text to take up space */
+    overflow: hidden; /* Prevents long text from breaking layout */
+}
+.card-details p {
+    margin: 4px 0;
+    font-size: 12px;
+    white-space: normal; /* Allow text to wrap */
+}
+.card-details .card-name {
+    font-size: 14px;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.card-details .card-name a {
+    color: #d1d1d1;
+    text-decoration: none;
+}
+.card-details .card-name a:hover {
+    text-decoration: underline;
+}
+.card-details .card-info {
+    color: #ccc;
+}
+.card-details .card-text {
+    font-size: 11px;
+    color: #ddd;
+}
+.card-details .flavor {
+    font-style: italic;
+    color: #bbb;
+}
+
+/* --- Search Area --- */
+.search-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.search-area .toggle-btn {
+    background-color: #5a5a5a;
+    border: 1px solid #777;
+    color: #d1d1d1;
+    border-radius: 4px;
+    font-weight: bold;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+}
+.search-area .toggle-btn.active {
+    background-color: #ff8c00;
+    color: #1e1e1e;
+    border-color: #ffaf4d;
+}
+.search-bar {
+    background-color: #212529;
+    border: 1px solid #5a5a5a;
+    border-radius: 5px;
+    color: white;
+    padding: 8px 12px;
+    width: 250px;
+}
+
+/* --- Quantity Controls --- */
+.controls {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 0 4px 0;
+    margin-top: auto; /* Pushes controls to the bottom */
+}
+.qty-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 25px;
+    text-align: center;
+}
+.qty-display {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* --- Image Modal/Popup --- */
+.image-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    justify-content: center;
+    align-items: center;
+}
+.modal-content {
+    display: block;
+    max-width: 35%;
+    max-height: 80%;
+}
+.modal-close {
+    position: absolute;
+    top: 20px;
+    right: 40px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    transition: 0.3s;
+    cursor: pointer;
+}
+.modal-close:hover,
+.modal-close:focus {
+    color: #bbb;
+}
+
+/* --- Context Menu --- */
+.context-menu {
+    display: none;
+    position: absolute;
+    z-index: 1000;
+    background-color: #2e2e2e;
+    border: 1px solid #5a5a5a;
+    border-radius: 5px;
+    padding: 5px 0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    min-width: 150px;
+}
+.context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.context-menu ul li {
+    padding: 8px 15px;
+    cursor: pointer;
+    color: #d1d1d1;
+}
+.context-menu ul li:hover {
+    background-color: #007bff;
+    color: white;
+}
+.context-menu ul hr {
+    border: none;
+    border-top: 1px solid #5a5a5a;
+    margin: 5px 0;
+}
+
+/* --- Advanced Search & Owned Indicator --- */
+.advanced-search-link {
+    font-size: 12px;
+    color: #ccc;
+    text-decoration: none;
+    margin-right: 5px;
+}
+.advanced-search-link:hover {
+    text-decoration: underline;
+}
+.owned-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 25px;
+    height: 25px;
+    background-color: #28a745;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid #3c3c3c;
+    z-index: 2;
+}
+
+/* --- Back Button --- */
+.back-button {
+    display: inline-block;
+    padding: 8px 15px;
+    margin-bottom: 20px;
+    background-color: #5a5a5a;
+    color: #d1d1d1;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+}
+.back-button:hover {
+    background-color: #6a6a6a;
+}
+
+/* --- Style for box header during data refresh --- */
+.box-header.refreshing {
+    background-color: #007bff; /* Blue indicator */
+    color: white;
+    cursor: wait;
+}
+.box-header.refreshing .arrow {
+    border-color: white;
+}
+
+/* --- Mana Symbols in Titles --- */
+.mana-symbol-small {
+    height: 18px;
+    vertical-align: sub;
+    margin: 0 1px;
+}
+
+/* --- MOBILE RESPONSIVE STYLES --- */
+/* These rules apply only when the screen width is 768px or less */
+@media (max-width: 768px) {
+
+    /* Stack header items vertically instead of side-by-side */
+    .app-header {
+        flex-direction: column;
+        padding: 10px;
+        gap: 10px; /* Adds space between the nav and search sections */
+    }
+
+    /* Allow nav buttons to wrap and center them */
+    .main-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Make the search area take up the full width */
+    .search-area {
+        width: 100%;
+    }
+
+    /* Make the search bar input take up the available space */
+    .search-bar {
+        flex-grow: 1;
+        width: auto; /* Override fixed width */
+    }
+
+    /* Adjust padding for main content on smaller screens */
+    .main-content {
+        padding: 10px;
+    }
+
+    /* Make card view and deck view stack vertically */
+    .card-view-container, .deck-view-grid {
+        flex-direction: column;
+        padding: 10px;
+    }
+    .card-view-left, .card-view-center, .card-view-right,
+    .deck-sidebar, .deck-main-area {
+        max-width: 100%;
+        flex-basis: auto;
+    }
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results for {{ query }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% include 'header.html' %}
+
+    <main class="main-content">
+        <h2>Search Results for "{{ query }}"</h2>
+        <hr>
+        {% if error %}
+            <p style="color: #ffcccc;">{{ error }}</p>
+        {% elif results %}
+            <div class="card-grid">
+                {% for card in results %}
+                    <div class="grid-card">
+                        {% if card.is_owned %}
+                            <div class="owned-indicator">✓</div>
+                        {% endif %}
+
+                        {% set image_source = card.get('image_url') or
+                                               (card.get('image_uris', {}).get('normal')) or
+                                               (card.get('card_faces', [{}])[0].get('image_uris', {}).get('normal')) or
+                                               'https://via.placeholder.com/150x209.png?text=No+Image' %}
+
+                        <a href="/card/{{ card.id }}?from=search&q={{ query }}">
+                            <img src="{{ ('/card_images/' + image_source) if card.image_url else image_source }}" alt="{{ card.name }}">
+                        </a>
+                        <p style="margin-top: 8px;">
+                            <strong><a href="/card/{{ card.id }}?from=search&q={{ query }}">{{ card.name }}</a></strong>
+                        </p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No results found.</p>
+        {% endif %}
+        {% include 'to_top_btn.html' %}
+    </main>
+
+    {% include 'modal.html' %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const resultsGrid = document.querySelector('.card-grid');
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            const closeModal = document.getElementById('modal-close');
+
+            if (resultsGrid) {
+                resultsGrid.addEventListener('click', (event) => {
+                    // Check if the user clicked on a card image
+                    if (event.target.tagName === 'IMG') {
+                        modal.style.display = "flex"; // Show the modal
+                        modalImage.src = event.target.src; // Set the image source
+                    }
+                });
+            }
+
+            // Listeners to close the modal
+            if(closeModal) {
+                closeModal.onclick = function() {
+                    modal.style.display = "none";
+                }
+                window.onclick = function(event) {
+                    if (event.target == modal) {
+                        modal.style.display = "none";
+                    }
+                }
+            }
+
+            // --- Scroll to Top Button Logic
+        const scrollTopBtn = document.getElementById('scroll-to-top-btn');
+        const mainContent = document.querySelector('.main-content'); // The scrollable element
+
+        if (scrollTopBtn && mainContent) {
+            // Show the button when the user scrolls down
+            mainContent.onscroll = () => {
+                if (mainContent.scrollTop > 20) {
+                    scrollTopBtn.style.display = "block";
+                } else {
+                    scrollTopBtn.style.display = "none";
+                }
+            };
+
+            // Scroll to the top when the user clicks the button
+            scrollTopBtn.addEventListener('click', () => {
+                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+        });
+    </script>
+</body>
+</html>

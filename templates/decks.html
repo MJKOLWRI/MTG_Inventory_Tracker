@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decks</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .deck-list-item-link {
+            text-decoration: none;
+            color: inherit;
+        }
+        .deck-list-item {
+            background-color: #2e2e2e;
+            border: 1px solid #5a5a5a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .deck-list-item:hover {
+            border-color: #777;
+        }
+        .deck-commander img {
+            width: 120px;
+            border-radius: 8px;
+        }
+        .deck-details {
+            flex-grow: 1;
+        }
+        .deck-details h2 {
+            margin: 0 0 10px 0;
+        }
+        .deck-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .deck-tag {
+            background-color: #5a5a5a;
+            color: #d1d1d1;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        #new-deck-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+    <main class="main-content">
+        <button id="new-deck-btn">+ Create New Deck</button>
+        <hr>
+        <div id="deck-list-container">
+            {% for deck in decks %}
+            <a href="/deck/{{ deck.name | urlencode }}" class="deck-list-item-link">
+                <div class="deck-list-item" data-deck-name="{{ deck.name }}">
+                    <div class="deck-commander">
+                        {% if deck.commander and deck.commander[0] and deck.commander[0].image_url %}
+                            <img src="/card_images/{{deck.commander[0].image_url}}" alt="{{ deck.commander[0].name }}">
+                        {% else %}
+                            <div style="width: 120px; height: 167px; background: #222; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666;">No Commander</div>
+                        {% endif %}
+                    </div>
+                    <div class="deck-details">
+                        <h2>
+                            {{ deck.name }}
+                            <span class="deck-color-identity">
+                                {% for color in deck.calculated_identity %}
+                                    <img src="{{ url_for('static', filename='mana_symbols/' + color + '.svg') }}" class="mana-symbol-small" alt="{{ color }}">
+                                {% endfor %}
+                            </span>
+                        </h2>
+                        <div class="deck-tags">
+                            {% for tag in deck.tags %}
+                            <span class="deck-tag">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </a>
+            {% else %}
+            <p>You haven't created any decks yet.</p>
+            {% endfor %}
+        </div>
+        {% include 'to_top_btn.html' %}
+    </main>
+
+    <div id="context-menu" class="context-menu"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const newDeckBtn = document.getElementById('new-deck-btn');
+            const deckListContainer = document.getElementById('deck-list-container');
+            const contextMenu = document.getElementById('context-menu');
+
+
+            // --- Scroll to Top Button Logic
+        const scrollTopBtn = document.getElementById('scroll-to-top-btn');
+        const mainContent = document.querySelector('.main-content'); // The scrollable element
+
+        if (scrollTopBtn && mainContent) {
+            // Show the button when the user scrolls down
+            mainContent.onscroll = () => {
+                if (mainContent.scrollTop > 20) {
+                    scrollTopBtn.style.display = "block";
+                } else {
+                    scrollTopBtn.style.display = "none";
+                }
+            };
+
+            // Scroll to the top when the user clicks the button
+            scrollTopBtn.addEventListener('click', () => {
+                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+            newDeckBtn.addEventListener('click', async () => {
+                const deckName = prompt("Please enter the name for the new deck:");
+                if (deckName && deckName.trim() !== '') {
+                    try {
+                        const response = await fetch('/create_deck', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ deck_name: deckName })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            alert(result.message);
+                            window.location.reload();
+                        } else {
+                            alert(`Error: ${result.error}`);
+                        }
+                    } catch (error) {
+                        alert('An unexpected error occurred.');
+                    }
+                }
+            });
+
+            const hideContextMenu = () => contextMenu.style.display = 'none';
+            window.addEventListener('click', (e) => { if(!e.target.closest('.context-menu')) hideContextMenu(); });
+
+            deckListContainer.addEventListener('contextmenu', (event) => {
+                const deckItem = event.target.closest('.deck-list-item');
+                if (!deckItem) return;
+
+                event.preventDefault();
+                const deckName = deckItem.dataset.deckName;
+                contextMenu.innerHTML = `<ul><li data-action="delete" data-deck-name="${deckName}">Delete Deck</li></ul>
+                                         <ul><li data-action="refresh-deck" data-deck-name="${deckName}">Refresh Deck Data</li></ul>`;
+
+                contextMenu.style.display = 'block';
+                contextMenu.style.left = `${event.pageX}px`;
+                contextMenu.style.top = `${event.pageY}px`;
+            });
+
+            contextMenu.addEventListener('click', async (event) => {
+                const action = event.target.dataset.action;
+                const deckName = event.target.dataset.deckName;
+
+                if (action === 'delete') {
+                    if (confirm(`Are you sure you want to delete the deck "${deckName}"? This cannot be undone.`)) {
+                        try {
+                            const response = await fetch('/delete_deck', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ deck_name: deckName })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                document.querySelector(`.deck-list-item[data-deck-name="${deckName}"]`).closest('a').remove();
+                            } else {
+                                alert(`Error: ${result.error}`);
+                            }
+                        } catch (error) {
+                            alert('An unexpected error occurred.');
+                        }
+                    }
+                } else if (action === 'refresh-deck') {
+                    alert('Refreshing deck data... The page will reload when complete.');
+                    const response = await fetch('/refresh_deck', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deck_name: deckName })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        window.location.reload();
+                    } else {
+                        alert(`Error: ${result.error}`);
+                    }
+                }
+                hideContextMenu();
+            });
+        });
+    </script>
+</body>
+</html>

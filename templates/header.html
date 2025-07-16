@@ -1,0 +1,65 @@
+<header class="app-header">
+    <nav class="main-nav">
+        {% for item in nav_items %}
+            <a href="{{ item.url }}">
+                <button class="{{ 'active' if item.label == active_page else '' }}">
+                    {{ item.label }}
+                </button>
+            </a>
+        {% endfor %}
+    </nav>
+
+    <div style="text-align: right;">
+        <form action="/search" method="GET" id="search-form">
+            <div class="search-area">
+                <button type="button" class="toggle-btn" data-name="non_library_search">N</button>
+                <button type="button" class="toggle-btn" data-name="library_search">L</button>
+                <input type="search" class="search-bar" name="q" placeholder="Search for a card...">
+                <input type="hidden" name="non_library_search" id="non_library_hidden">
+                <input type="hidden" name="library_search" id="library_hidden">
+            </div>
+        </form>
+        <a href="/advanced_search" class="advanced-search-link">Advanced Search</a>
+    </div>
+</header>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // This script now handles the toggle buttons for every page that includes the header.
+    const libToggle = document.querySelector('.toggle-btn[data-name="library_search"]');
+    const nonLibToggle = document.querySelector('.toggle-btn[data-name="non_library_search"]');
+    const libHidden = document.getElementById('library_hidden');
+    const nonLibHidden = document.getElementById('non_library_hidden');
+
+    // Function to set the state of a button based on a value ('on' or 'off')
+    const setButtonState = (button, hiddenInput, state) => {
+        if (state === 'on') {
+            button.classList.add('active');
+            hiddenInput.value = 'on';
+        } else {
+            button.classList.remove('active');
+            hiddenInput.value = '';
+        }
+    };
+
+    // 1. On page load, apply the saved state from localStorage
+    const savedLibState = localStorage.getItem('library_search_toggle') || 'on'; // Default to 'on'
+    const savedNonLibState = localStorage.getItem('non_library_search_toggle') || 'off'; // Default to 'off'
+
+    setButtonState(libToggle, libHidden, savedLibState);
+    setButtonState(nonLibToggle, nonLibHidden, savedNonLibState);
+
+    // 2. Add click listeners that update the state and save to localStorage
+    libToggle.addEventListener('click', () => {
+        const newState = libToggle.classList.toggle('active') ? 'on' : 'off';
+        libHidden.value = newState === 'on' ? 'on' : '';
+        localStorage.setItem('library_search_toggle', newState);
+    });
+
+    nonLibToggle.addEventListener('click', () => {
+        const newState = nonLibToggle.classList.toggle('active') ? 'on' : 'off';
+        nonLibHidden.value = newState === 'on' ? 'on' : '';
+        localStorage.setItem('non_library_search_toggle', newState);
+    });
+});
+</script>

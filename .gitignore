@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+.venv/
+venv/
+
+# PyInstaller files
+build/
+dist/
+*.spec
+
+# IDE files
+.idea/
+
+# Local Data (Do not upload your personal collection)
+data.json
+config.json
+decks/
+card_images/
+backups/
+
+# Logs
+*.log
+app_log.txt

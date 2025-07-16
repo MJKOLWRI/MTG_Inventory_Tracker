@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ card.name if card else 'Card Not Found' }} - Details</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .card-view-container { display: flex; gap: 20px; padding: 20px; }
+        .card-view-left { flex: 0 0 25%; max-width: 300px; }
+        .card-view-center { flex-grow: 1; }
+        .card-view-right { flex: 0 0 30%; } /* Increased width for new menu */
+        .card-view-left img { width: 100%; border-radius: 12px; }
+        .location-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+        .location-box { background-color: #ff8c00; color: #1e1e1e; padding: 10px 15px; border-radius: 5px; font-weight: bold; }
+        .location-box a { color: inherit; text-decoration: none; }
+        .alt-printings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .alt-printings-grid img { width: 100%; border-radius: 5px; }
+        .notes-area { width: 100%; min-height: 150px; background: #212529; color: white; border: 1px solid #5a5a5a; border-radius: 5px; padding: 10px; box-sizing: border-box; }
+        .save-note-btn { background-color: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        .inventory-menu { background-color: #2e2e2e; padding: 15px; border-radius: 5px; margin-top: 15px; }
+        .inventory-menu .form-group { margin-bottom: 10px; }
+        .inventory-menu label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        .inventory-menu input, .inventory-menu select { width: 100%; padding: 8px; background: #212529; color: white; border: 1px solid #5a5a5a; border-radius: 4px; box-sizing: border-box; }
+        .inventory-menu button { background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
+        .tags-editor .tag { background-color: #5a5a5a; padding: 5px 10px; border-radius: 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; margin: 3px; }
+        .tags-editor .remove-tag { color: #ffcccc; cursor: pointer; font-weight: bold; }
+        .tag-input-group { display: flex; gap: 8px; margin-top: 10px; }
+        .tag-input-group input { width: 100%; padding: 8px; background: #212529; color: white; border: 1px solid #5a5a5a; border-radius: 4px; box-sizing: border-box; }
+        .tag-input-group button { background-color: #007bff; color: white; border: none; border-radius: 5px; padding: 0 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+    <main class="main-content">
+
+        <a href="#" id="back-button" class="back-button">&larr; Back</a>
+
+        {% if card %}
+        <div class="card-view-container">
+            <div class="card-view-left">
+                {% if card.layout in ['transform', 'modal_dfc', 'reversible_card'] %}
+                    {# --- Logic for Double-Faced Cards --- #}
+
+                    {# Face 0 #}
+                    {% set face0_path = card.card_faces[0].get('image_uris', {}).get('normal', '') %}
+                    {% if face0_path %}
+                        {# Check if the path is a full URL or a local filename #}
+                        {% if face0_path.startswith('http') %}
+                            <img src="{{ face0_path }}" alt="{{ card.card_faces[0].name }}">
+                        {% else %}
+                            <img src="/card_images/{{ face0_path }}" alt="{{ card.card_faces[0].name }}">
+                        {% endif %}
+                    {% endif %}
+
+                    {# Face 1 #}
+                    {% set face1_path = card.card_faces[1].get('image_uris', {}).get('normal', '') %}
+                    {% if face1_path %}
+                        {% if face1_path.startswith('http') %}
+                            <img src="{{ face1_path }}" alt="{{ card.card_faces[1].name }}">
+                        {% else %}
+                            <img src="/card_images/{{ face1_path }}" alt="{{ card.card_faces[1].name }}">
+                        {% endif %}
+                    {% endif %}
+
+                {% else %}
+                    {# --- Logic for Single-Faced Cards --- #}
+                    {% set image_path = card.get('image_url') or card.get('image_uris', {}).get('normal') %}
+                    {% if image_path %}
+                        {# Check if the path is a full URL or a local filename #}
+                        {% if image_path.startswith('http') %}
+                            <img src="{{ image_path }}" alt="{{ card.name }}">
+                        {% else %}
+                            <img src="/card_images/{{ image_path }}" alt="{{ card.name }}">
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+                <h3>Tags</h3>
+                <div id="tags-editor" class="tags-editor" data-card-name="{{ card.name }}">
+                    <div id="tags-container">
+                        {% for tag in card_tags %}
+                        <span class="tag">{{ tag }}<span class="remove-tag" title="Remove tag">&times;</span></span>
+                        {% endfor %}
+                    </div>
+                    <div class="tag-input-group">
+                        <input type="text" id="new-tag-input" placeholder="Add a tag...">
+                        <button id="add-tag-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-view-center">
+                <h2>{{ card.name }} <span style="color: #ccc;">(Total Owned: {{ total_quantity }})</span></h2>
+                <hr>
+                {% if card.card_faces %}
+                    {% for face in card.card_faces %}
+                        <p><strong>{{ face.name }}</strong></p>
+                        <p><strong>{{ face.mana_cost | replace_symbols | safe }}</strong></p>
+                        <p><strong>{{ face.type_line }}</strong></p>
+                        <p>{{ face.oracle_text | replace_symbols | safe }}</p>
+                        {% if face.flavor_text %}<p style="font-style: italic; color: #ccc;">{{ face.flavor_text }}</p>{% endif %}
+                        {% if face.power %}<h3 style="margin-top: 10px;">{{ face.power }}/{{ face.toughness }}</h3>{% endif %}
+                        {% if not loop.last %}<hr class="face-separator">{% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p><strong>{{ card.mana_cost | replace_symbols | safe }}</strong></p>
+                    <p><strong>{{ card.type_line }}</strong></p>
+                    <p>{{ card.oracle_text | replace_symbols | safe }}</p>
+                    {% if card.flavor_text %}<p style="font-style: italic; color: #ccc;">{{ card.flavor_text }}</p>{% endif %}
+                    {% if card.power %}<h3 style="margin-top: 15px;">{{ card.power }}/{{ card.toughness }}</h3>{% endif %}
+                {% endif %}
+                <hr>
+                <h3>Locations</h3>
+                <div class="location-grid">
+                    {% for loc in current_locations %}
+                    <div class="location-box">
+                        <a href="{{ '/deck/' + loc.id | urlencode if loc.type == 'deck' else '/?box=' + loc.id }}">
+                            {{ loc.name }} (Qty: {{ loc.quantity }})
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if alternate_printings %}
+                <hr>
+                <h3>Alternate Printings You Own</h3>
+                <div class="alt-printings-grid">
+                    {% for alt_card in alternate_printings %}
+                        <a href="/card/{{ alt_card.id }}">
+                            <img src="{{ ('/card_images/' + alt_card.image_url) if alt_card.image_url else 'https://via.placeholder.com/150x209.png?text=No+Image' }}" alt="{{ card.name }}">
+                        </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="card-view-right">
+                <h3>Notes</h3>
+                <textarea id="notes-area" class="notes-area">{{ notes }}</textarea>
+                <button id="save-note-btn" class="save-note-btn">Save Note</button>
+                <p id="save-status" style="color: #5cb85c; font-size: 14px; margin-top: 10px;"></p>
+                <hr>
+                <h3>Manage Inventory</h3>
+                <div id="inventory-container" class="inventory-menu">
+                    {% if current_locations %}
+                    <form id="move-form">
+                        <div class="form-group">
+                            <label for="move-from-select">Move From:</label>
+                            <select id="move-from-select">
+                                {% for loc in current_locations %}
+                                <option value="{{ loc.type }}:{{ loc.id }}" data-max-qty="{{ loc.quantity }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <p style="font-size: 12px; color: #ccc;">Quantity in selected location: <strong id="max-qty-display">{{ current_locations[0].quantity }}</strong></p>
+                        <div class="form-group">
+                            <label for="move-qty-input">Quantity to move:</label>
+                            <input type="number" id="move-qty-input" value="1" min="1" max="{{ current_locations[0].quantity }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="move-to-select">Move To:</label>
+                            <select id="move-to-select">
+                                {% for loc in all_locations %}
+                                <option value="{{ loc.type }}:{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit">Move</button>
+                    </form>
+                    {% endif %}
+                    <form id="add-form">
+                        <div class="form-group">
+                            <label for="add-qty-input">Quantity to add:</label>
+                            <input type="number" id="add-qty-input" value="1" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="add-to-select">Add to:</label>
+                            <select id="add-to-select">
+                                {% for loc in all_locations %}
+                                <option value="{{ loc.type }}:{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit">Add</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+            <h2>Card not found</h2>
+        {% endif %}
+        {% include 'to_top_btn.html' %}
+    </main>
+
+    {% include 'modal.html' %}
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const fullCardData = {{ card | tojson }};
+
+        const handleInventorySubmit = async (payload) => {
+            try {
+                const response = await fetch('/manage_inventory', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload(); // Simple reload to see changes
+                } else { alert(`Error: ${result.error}`); }
+            } catch (error) { alert('An unexpected network error occurred.'); }
+        };
+
+        const backBtn = document.getElementById('back-button');
+        if (backBtn) {
+            backBtn.addEventListener('click', (event) => {
+                event.preventDefault(); // Prevent the link from navigating to "#"
+                window.history.back();  // Go to the previous page in the browser's history
+            });
+        }
+
+        // --- Scroll to Top Button Logic
+        const scrollTopBtn = document.getElementById('scroll-to-top-btn');
+        const mainContent = document.querySelector('.main-content'); // The scrollable element
+
+        if (scrollTopBtn && mainContent) {
+            // Show the button when the user scrolls down
+            mainContent.onscroll = () => {
+                if (mainContent.scrollTop > 20) {
+                    scrollTopBtn.style.display = "block";
+                } else {
+                    scrollTopBtn.style.display = "none";
+                }
+            };
+
+            // Scroll to the top when the user clicks the button
+            scrollTopBtn.addEventListener('click', () => {
+                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+        const addForm = document.getElementById('add-form');
+        if (addForm) {
+            addForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const qty = document.getElementById('add-qty-input').value;
+                const dest = document.getElementById('add-to-select').value.split(':');
+                const cardImage = fullCardData.image_uris?.normal || fullCardData.card_faces?.[0]?.image_uris?.normal;
+                handleInventorySubmit({
+                    action: 'add', quantity: qty,
+                    destination: { type: dest[0], id: dest[1] },
+                    card_id: fullCardData.id
+                });
+            });
+        }
+
+        const moveForm = document.getElementById('move-form');
+        if (moveForm) {
+            const moveFromSelect = document.getElementById('move-from-select');
+            const qtyInput = document.getElementById('move-qty-input');
+            const maxQtyDisplay = document.getElementById('max-qty-display');
+
+            moveFromSelect.addEventListener('change', () => {
+                const maxQty = moveFromSelect.selectedOptions[0].dataset.maxQty;
+                qtyInput.value = 1;
+                qtyInput.max = maxQty;
+                maxQtyDisplay.textContent = maxQty;
+            });
+
+            moveForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const qty = qtyInput.value;
+                if (parseInt(qty) > parseInt(qtyInput.max)) {
+                    alert('Cannot move more cards than exist in the source location.');
+                    return;
+                }
+                const source = document.getElementById('move-from-select').value.split(':');
+                const dest = document.getElementById('move-to-select').value.split(':');
+                handleInventorySubmit({
+                    action: 'move', quantity: qty,
+                    source: { type: source[0], id: source[1] },
+                    destination: { type: dest[0], id: dest[1] },
+                    card_id: fullCardData.id
+                });
+            });
+        }
+
+        const saveBtn = document.getElementById('save-note-btn');
+        const notesArea = document.getElementById('notes-area');
+        const saveStatus = document.getElementById('save-status');
+        if(saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                saveStatus.textContent = 'Saving...';
+                const response = await fetch('/save_note', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_name: fullCardData.name, note_text: notesArea.value })
+                });
+                const result = await response.json();
+                if(result.success) {
+                    saveStatus.textContent = result.message;
+                    setTimeout(() => saveStatus.textContent = '', 2000);
+                } else {
+                    saveStatus.textContent = 'Error saving note.';
+                    saveStatus.style.color = '#dc3545';
+                }
+            });
+        }
+
+        const tagsEditor = document.getElementById('tags-editor');
+            if (tagsEditor) {
+                const addTagBtn = document.getElementById('add-tag-btn');
+                const newTagInput = document.getElementById('new-tag-input');
+                const tagsContainer = document.getElementById('tags-container');
+
+                const saveTags = async () => {
+                    const currentTags = Array.from(tagsContainer.querySelectorAll('.tag')).map(span => span.firstChild.textContent);
+                    await fetch('/update_card_tags', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ card_name: tagsEditor.dataset.cardName, tags: currentTags })
+                    });
+                };
+
+                const addTag = () => {
+                    const tagText = newTagInput.value.trim();
+                    if (tagText && !Array.from(tagsContainer.querySelectorAll('.tag')).some(t => t.firstChild.textContent === tagText)) {
+                        const tagHtml = `<span class="tag">${tagText}<span class="remove-tag" title="Remove tag">&times;</span></span>`;
+                        tagsContainer.insertAdjacentHTML('beforeend', tagHtml);
+                        newTagInput.value = '';
+                        saveTags();
+                    }
+                };
+
+                addTagBtn.addEventListener('click', addTag);
+                newTagInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.preventDefault(); addTag(); }});
+
+                tagsContainer.addEventListener('click', (event) => {
+                    if(event.target.classList.contains('remove-tag')) {
+                        event.target.closest('.tag').remove();
+                        saveTags();
+                    }
+                });
+            }
+    });
+    </script>
+</body>
+</html>

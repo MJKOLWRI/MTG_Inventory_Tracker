@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Inventory - Import</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .import-container { padding: 20px; max-width: 900px; margin: auto; }
+        .view-toggle { display: flex; justify-content: center; margin-bottom: 25px; }
+        .view-toggle button { padding: 10px 25px; font-size: 16px; font-weight: bold; background-color: #5a5a5a; border: 1px solid #777; color: #d1d1d1; cursor: pointer; }
+        .view-toggle button:first-child { border-radius: 5px 0 0 5px; }
+        .view-toggle button:last-child { border-radius: 0 5px 5px 0; }
+        .view-toggle button.active { background-color: #007bff; color: white; }
+        .import-view { display: none; }
+        .import-view.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; background-color: #212529; border: 1px solid #5a5a5a; border-radius: 5px; color: white; box-sizing: border-box; }
+        .form-group textarea { min-height: 250px; resize: vertical; font-family: monospace; }
+        .action-btn { padding: 12px 20px; font-size: 16px; font-weight: bold; color: #fff; background-color: #28a745; border: none; border-radius: 5px; cursor: pointer; width: 100%; }
+        .action-btn:hover { background-color: #218838; }
+        .search-type-selector { display: flex; gap: 15px; margin-bottom: 8px; }
+        .search-input-group { display: flex; gap: 8px; }
+        .search-input-group input { flex-grow: 1; }
+        .search-input-group button { background-color: #007bff; color: white; border: none; border-radius: 5px; padding: 0 20px; font-weight: bold; cursor: pointer; }
+
+        /* NEW: Style for the help buttons */
+        .help-icon {
+            display: inline-block;
+            cursor: pointer;
+            color: #007bff;
+            font-weight: bold;
+            margin-left: 8px;
+            border: 1px solid #007bff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            line-height: 16px;
+            text-align: center;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+    <main class="main-content">
+        <div class="import-container">
+            <div class="view-toggle">
+                <button id="deck-list-btn" class="view-toggle-btn">Deck List</button>
+                <button id="manual-btn" class="view-toggle-btn active">Manual</button>
+            </div>
+
+            <div id="manual-view" class="import-view active">
+                <div class="form-group">
+                    <label for="location-select">Add to:<span id="location-help-btn" class="help-icon" title="Get Help">?</span></label>
+                    <select id="location-select">
+                        <option value="new_box">Create New Box</option>
+                        {% for loc in all_locations %}
+                        <option value="{{ loc.type }}:{{ loc.id }}">{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Search by:<span id="shortcuts-help-btn" class="help-icon" title="Get Help">?</span></label>
+                    <div class="search-type-selector">
+                        <label><input type="radio" name="search_type" value="name" checked> Card Name</label>
+                        <label><input type="radio" name="search_type" value="number_set"> Collector # + Set</label>
+                    </div>
+                    <div class="search-input-group">
+                        <input type="search" id="card-search" placeholder="e.g., Sol Ring or 298 2X2">
+                        <button id="search-btn">Search</button>
+                    </div>
+                </div>
+                <div id="card-results-grid" class="card-grid"></div>
+            </div>
+
+            <div id="deck-list-view" class="import-view">
+                <div class="form-group">
+                    <label for="deck-name">New Deck Name:</label>
+                    <input type="text" id="deck-name" placeholder="My Awesome Deck">
+                </div>
+                <div class="form-group">
+                    <label for="deck-list-paste">Paste Decklist (e.g., "1 Card Name (SET) 123"):</label>
+                    <textarea id="deck-list-paste" placeholder="1 Sol Ring (MOC) 336&#10;1 Vivi Ornitier (FIN) 248..."></textarea>
+                </div>
+                <button id="import-deck-btn" class="action-btn">Import Deck</button>
+                <p id="import-status" style="margin-top:10px;"></p>
+            </div>
+        </div>
+        {% include 'to_top_btn.html' %}
+    </main>
+
+    {% include 'modal.html' %}
+
+ <script>
+    // Make collection data from Flask available to JavaScript
+    const allBoxes = {{ all_boxes | tojson }};
+    const allDecks = {{ all_decks | tojson }};
+    const config = {{ config | tojson }};
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- Get All Elements ---
+    const manualBtn = document.getElementById('manual-btn');
+    const deckListBtn = document.getElementById('deck-list-btn');
+    const manualView = document.getElementById('manual-view');
+    const deckListView = document.getElementById('deck-list-view');
+    const locationSelect = document.getElementById('location-select');
+    const searchInput = document.getElementById('card-search');
+    const searchBtn = document.getElementById('search-btn');
+    const resultsGrid = document.getElementById('card-results-grid');
+    const importDeckBtn = document.getElementById('import-deck-btn');
+    const deckNameInput = document.getElementById('deck-name');
+    const deckListInput = document.getElementById('deck-list-paste');
+    const importStatus = document.getElementById('import-status');
+    const modal = document.getElementById('image-modal');
+    const modalImage = document.getElementById('modal-image');
+    const closeModal = document.getElementById('modal-close');
+    const locationHelpBtn = document.getElementById('location-help-btn');
+    const shortcutsHelpBtn = document.getElementById('shortcuts-help-btn');
+
+
+    // --- Scroll to Top Button Logic
+        const scrollTopBtn = document.getElementById('scroll-to-top-btn');
+        const mainContent = document.querySelector('.main-content'); // The scrollable element
+
+        if (scrollTopBtn && mainContent) {
+            // Show the button when the user scrolls down
+            mainContent.onscroll = () => {
+                if (mainContent.scrollTop > 20) {
+                    scrollTopBtn.style.display = "block";
+                } else {
+                    scrollTopBtn.style.display = "none";
+                }
+            };
+
+            // Scroll to the top when the user clicks the button
+            scrollTopBtn.addEventListener('click', () => {
+                mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+
+    // --- Set Default Import Location on Page Load ---
+    const applyDefaultLocation = () => {
+        const defaultMode = config.import_default?.mode || 'last_selected';
+
+        if (defaultMode === 'new_box') {
+            locationSelect.value = 'new_box';
+        } else if (defaultMode === 'specific') {
+            locationSelect.value = config.import_default.default_location;
+        } else { // 'last_selected' is the fallback
+            const lastUsed = localStorage.getItem('last_selected_import_location');
+            if (lastUsed) {
+                locationSelect.value = lastUsed;
+            }
+        }
+    };
+
+    applyDefaultLocation(); // Call the function when the page loads
+    // --- View Toggling Logic ---
+    const toggleView = (activeView, activeBtn) => {
+        [manualBtn, deckListBtn].forEach(btn => btn.classList.remove('active'));
+        [manualView, deckListView].forEach(view => view.classList.remove('active'));
+        activeBtn.classList.add('active');
+        activeView.classList.add('active');
+    };
+    manualBtn.addEventListener('click', () => toggleView(manualView, manualBtn));
+    deckListBtn.addEventListener('click', () => toggleView(deckListView, deckListBtn));
+
+    // --- Manual Import Logic ---
+    const getOwnedQuantity = (cardId) => {
+        const selectedLocationValue = locationSelect.value;
+        if (!selectedLocationValue || selectedLocationValue === 'new_box') return 0;
+        const [type, id] = selectedLocationValue.split(':');
+        let locationData = null;
+        if (type === 'box') {
+            locationData = allBoxes.find(b => b.id === id);
+        } else if (type === 'deck') {
+            locationData = allDecks.find(d => d.name === id);
+        }
+        if (!locationData) return 0;
+        const cardList = locationData.mainboard || locationData.cards || [];
+        const cardInLocation = cardList.find(card => card.id === cardId);
+        return cardInLocation ? cardInLocation.quantity : 0;
+    };
+
+    // --- Help Button Logic ---
+        if (locationHelpBtn) {
+            locationHelpBtn.addEventListener('click', () => {
+                alert("Reminder: Make sure you have the correct Box or Deck selected from the dropdown before adding cards.");
+            });
+        }
+
+        if (shortcutsHelpBtn) {
+            shortcutsHelpBtn.addEventListener('click', () => {
+                const shortcuts = `
+                Keyboard Shortcuts for Manual Import:
+
+                - Ctrl + Space: Clear and focus the search bar.
+                - Ctrl + M: Toggle search mode (Name / Number & Set).
+                - Ctrl + Plus (+): Add 1 of the first card in the results.
+                - Ctrl + Minus (-): Remove 1 of the first card in the results.
+                `;
+                alert(shortcuts.trim());
+            });
+        }
+
+    const performSearch = async () => {
+        const searchType = document.querySelector('input[name="search_type"]:checked').value;
+        const query = searchInput.value.trim();
+        if (!query) return;
+        resultsGrid.innerHTML = '<p>Searching...</p>';
+        try {
+            const response = await fetch('/search_scryfall', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: searchType, query: query })
+            });
+            const result = await response.json();
+            resultsGrid.innerHTML = '';
+            if (result.error) {
+                resultsGrid.innerHTML = `<p style="color: #ffcccc;">Error: ${result.error}</p>`;
+                return;
+            }
+            const cards = result.data || [result];
+            cards.forEach(card => {
+                const imageUri = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || 'https://via.placeholder.com/160x220.png?text=No+Image';
+                const ownedQuantity = getOwnedQuantity(card.id);
+                const cardHtml = `
+                    <div class="grid-card" data-card-id="${card.id}" data-card-name="${card.name}" data-card-image="${imageUri}">
+                        <img src="${imageUri}" alt="${card.name}">
+                        <div class="controls">
+                            <button class="qty-btn" data-change="-1">-</button>
+                            <div class="qty-display">${ownedQuantity}</div>
+                            <button class="qty-btn" data-change="1">+</button>
+                        </div>
+                    </div>`;
+                resultsGrid.insertAdjacentHTML('beforeend', cardHtml);
+            });
+        } catch (error) { console.error('Fetch Error:', error); }
+    };
+    searchBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') performSearch(); });
+
+    locationSelect.addEventListener('change', () => {
+        if (locationSelect.value) {
+            localStorage.setItem('last_selected_import_location', locationSelect.value);
+        }
+        document.querySelectorAll('.grid-card').forEach(cardDiv => {
+            const ownedQuantity = getOwnedQuantity(cardDiv.dataset.cardId);
+            cardDiv.querySelector('.qty-display').textContent = ownedQuantity;
+        });
+    });
+
+    // In your templates/import.html script, replace the resultsGrid listener with this:
+
+resultsGrid.addEventListener('click', async (event) => {
+    const qtyButton = event.target.closest('.qty-btn');
+    const image = event.target.closest('img');
+
+    // --- Logic for +/- Buttons ---
+    if (qtyButton && !qtyButton.disabled) {
+        const cardDiv = qtyButton.closest('.grid-card');
+        const change = parseInt(qtyButton.dataset.change, 10);
+        const selectedLocationValue = locationSelect.value;
+        let destination = {};
+
+        if (selectedLocationValue === 'new_box') {
+            destination = { type: 'box', id: '' };
+        } else {
+            const parts = selectedLocationValue.split(':');
+            destination = { type: parts[0], id: parts[1] };
+        }
+
+        const cardId = cardDiv.dataset.cardId;
+        const response = await fetch('/manage_inventory', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: change > 0 ? 'add' : 'subtract',
+                quantity: 1,
+                destination: destination,
+                card_id: cardId
+            })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            // --- FIX: This section now correctly updates the live data in your browser ---
+            const qtyDisplay = cardDiv.querySelector('.qty-display');
+            const newQtyOnScreen = parseInt(qtyDisplay.textContent) + change;
+
+            // 1. Update the UI
+            qtyDisplay.textContent = newQtyOnScreen;
+            cardDiv.querySelector('.qty-btn[data-change="-1"]').disabled = (newQtyOnScreen <= 0);
+
+            // 2. Find the correct location (box or deck) in our local JavaScript data
+            let targetLocation;
+            if (result.new_box_info) {
+                // If a new box was created by the backend
+                targetLocation = result.new_box_info;
+                allBoxes.push(targetLocation); // Add it to our local data
+                const newOption = new Option(`Box #${targetLocation.id} (${targetLocation.alias})`, `box:${targetLocation.id}`);
+                locationSelect.add(newOption);
+                locationSelect.value = `box:${targetLocation.id}`;
+            } else {
+                targetLocation = destination.type === 'box'
+                    ? allBoxes.find(b => b.id === destination.id)
+                    : allDecks.find(d => d.name === destination.id);
+            }
+
+            // 3. Update the card's quantity in that location's data
+            if (targetLocation) {
+                const cardList = targetLocation.cards || targetLocation.mainboard;
+                let cardInList = cardList.find(c => c.id === cardId);
+
+                if (cardInList) {
+                    cardInList.quantity = newQtyOnScreen;
+                    if (cardInList.quantity <= 0) {
+                        targetLocation.cards = cardList.filter(c => c.id !== cardId);
+                    }
+                } else if (newQtyOnScreen > 0) {
+                    // If the card was new to this location, add it to the local data
+                    cardList.push({ id: cardId, name: cardDiv.dataset.cardName, image_url: cardDiv.dataset.cardImage, quantity: newQtyOnScreen });
+                }
+            }
+        } else {
+            alert(`Error: ${result.error}`);
+        }
+    }
+
+    // --- Logic for Image Popup ---
+    else if (image) {
+        if(modal) modal.style.display = "flex";
+        if(modalImage) modalImage.src = image.src;
+    }
+});
+
+    // --- Decklist Importer Logic ---
+    if (importDeckBtn) {
+        importDeckBtn.addEventListener('click', async () => {
+            const deckName = deckNameInput.value.trim();
+            const decklistText = deckListInput.value.trim();
+            if (!deckName || !decklistText) { alert('Please provide a deck name and a decklist.'); return; }
+            importDeckBtn.disabled = true;
+            importStatus.textContent = 'Importing... This may take a moment.';
+            try {
+                const response = await fetch('/import_decklist', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ deck_name: deckName, decklist_text: decklistText })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    let message = result.message;
+                    if (result.errors && result.errors.length > 0) {
+                        message += '\n\nCould not import:\n' + result.errors.join('\n');
+                    }
+                    alert(message);
+                    window.location.href = `/deck/${encodeURIComponent(deckName)}`;
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (e) {
+                alert('A critical error occurred.');
+            } finally {
+                importDeckBtn.disabled = false;
+                importStatus.textContent = '';
+            }
+        });
+    }
+
+    // --- Modal Closing Logic ---
+    if(closeModal) {
+        closeModal.onclick = () => modal.style.display = "none";
+        window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
+    }
+
+    // --- Keyboard Shortcut Handler ---
+    document.addEventListener('keydown', (event) => {
+        if (!manualView.classList.contains('active')) return;
+        if (event.ctrlKey && event.code === 'Space') {
+            // clear search field and focus it
+            event.preventDefault();
+            searchInput.value = '';
+            searchInput.focus();
+        }
+        if (event.ctrlKey && event.code === 'KeyM') {
+            // switch search mode and clear search field + focus it
+            const nameRadio = document.querySelector('input[name="search_type"][value="name"]');
+            const numberRadio = document.querySelector('input[name="search_type"][value="number_set"]');
+
+            if (nameRadio.checked) {
+                numberRadio.checked = true;
+            } else {
+                nameRadio.checked = true;
+            }
+            event.preventDefault();
+            searchInput.value = '';
+            searchInput.focus();
+        }
+        if (event.ctrlKey && (event.code === 'Equal' || event.code === 'NumpadAdd')) {
+            // increase first card quantity
+            event.preventDefault();
+            const firstCard = resultsGrid.querySelector('.grid-card .qty-btn[data-change="1"]');
+            if (firstCard) firstCard.click();
+        }
+        if (event.ctrlKey && (event.code === 'Minus' || event.code === 'NumpadSubtract')) {
+            // decrease first card quantity
+            event.preventDefault();
+            const firstCardMinusBtn = resultsGrid.querySelector('.grid-card .qty-btn[data-change="-1"]');
+            if (firstCardMinusBtn && !firstCardMinusBtn.disabled) {
+                firstCardMinusBtn.click();
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>
